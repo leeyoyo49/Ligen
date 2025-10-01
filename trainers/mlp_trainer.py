@@ -169,22 +169,23 @@ class MLPTrainer:
                 pbar.update(1)
                 pbar.set_postfix_str(f"train={train_loss:.4f} eval={eval_loss:.4f} ETA={format_hms(remain)}")
 
-                # NEW: accumulate row into the tune table
-                # if tune_table is not None:
-                #     tune_table.add_data(
-                #         int(epoch),
-                #         as_scalar(train_loss),
-                #         as_scalar(eval_loss),
-                #         as_scalar(remain),
-                #     )
+                # Populate the tune table with metrics
+                if tune_table is not None:
+                    tune_table.add_data(
+                        int(epoch),
+                        as_scalar(train_loss),
+                        as_scalar(eval_loss),
+                        as_scalar(remain),
+                    )
 
-                # if trun is not None:
-                #     trun.log({
-                #         f"{self.tag}/loss/tune/train_loss": as_scalar(train_loss),
-                #         f"{self.tag}/loss/tune/eval_loss":  as_scalar(eval_loss),
-                #         f"{self.tag}/time/tune_eta_sec":    as_scalar(remain),
-                #         "epoch": epoch,
-                #     })
+                # Log to W&B during tuning
+                if trun is not None:
+                    trun.log({
+                        f"{self.tag}/loss/tune/train_loss": as_scalar(train_loss),
+                        f"{self.tag}/loss/tune/eval_loss":  as_scalar(eval_loss),
+                        f"{self.tag}/time/tune_eta_sec":    as_scalar(remain),
+                        "epoch": epoch,
+                    })
 
                 trial.report(eval_loss, epoch)
                 if trial.should_prune():
@@ -230,14 +231,18 @@ class MLPTrainer:
     # Final training（記在當前 active run：final run）
     # --------------------------
     def train_final(self, save_path: str):
+        # Add safety check for best_params
+        if not self.best_params:
+            raise ValueError("Must call tune() before train_final() - no best parameters available")
+            
         model = Net(
             self.input_size,
             self.best_params["hidden_size"],
             self.output_size,
             self.best_params["dropout_rate"],
         ).to(self.device)
-        # We'll compute a dataset-level mean by weighting batch means with batch size
-        criterion = CustomLoss(reduction="mean")
+        # Use 'sum' reduction consistently with tuning phase
+        criterion = CustomLoss(reduction="sum")
         optim = torch.optim.Adam(model.parameters(), lr=self.best_params["learning_rate"])
 
         meter = ETAMeter(self.cfg.epoch_cnt)
@@ -273,8 +278,8 @@ class MLPTrainer:
                 loss.backward()
                 optim.step()
                 bsz = int(y.size(0))
-                # loss is mean over batch; multiply by batch size to get summed loss
-                total_wsum += float(loss.item()) * bsz
+                # loss is summed over batch (reduction='sum')
+                total_wsum += float(loss.item())
                 total_n += bsz
 
             # compute eval loss over test/eval loader (dataset-level average) for display only
@@ -286,9 +291,9 @@ class MLPTrainer:
                     for x, y in self.test_loader:
                         x, y = self._ensure_xy(x, y)
                         x, y = x.to(self.device).float(), y.to(self.device).float()
-                        l = criterion(model(x), y)  # mean over batch
+                        l = criterion(model(x), y)  # summed over batch (reduction='sum')
                         bsz = int(y.size(0))
-                        eval_wsum += float(l.item()) * bsz
+                        eval_wsum += float(l.item())
                         eval_n += bsz
                 eval_avg_loss = eval_wsum / max(eval_n, 1)
 

@@ -120,8 +120,8 @@ class TabGANTrainer:
                 pass
             self._wb_defined = True
         t0 = time.time()
-        last_d = torch.tensor(0.0, device=self.device)
-        last_g = torch.tensor(0.0, device=self.device)
+        last_d = 0.0
+        last_g = 0.0
 
         def add_instance_noise(x):
             if self.inst_noise_std > 0:
@@ -145,7 +145,7 @@ class TabGANTrainer:
                 bsz = real.size(0)
 
                 # Discriminator (optionally multiple steps like CGAN)
-                d_loss = None
+                d_losses = []
                 for _ in range(self.d_steps):
                     z = torch.randn(bsz, self.z_dim, device=self.device)
                     with autocast(enabled=self.use_amp):
@@ -161,7 +161,7 @@ class TabGANTrainer:
                         if self.r1_gamma > 0:
                             rl = self.D(real_in).sum()
                             grads = torch.autograd.grad(rl, real_in, create_graph=True, retain_graph=True, only_inputs=True)[0]
-                            r1_pen = (grads.view(bsz, -1).pow(2).sum(1)).mean() * (self.r1_gamma * 0.5)
+                            r1_pen = (grads.view(bsz, -1).pow(2).sum(1)).mean() * self.r1_gamma
                             d_loss = d_loss + r1_pen
                     self.scalerD.scale(d_loss).backward()
                     if self.grad_clip > 0:
@@ -169,7 +169,10 @@ class TabGANTrainer:
                         torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.grad_clip)
                     self.scalerD.step(self.optD)
                     self.scalerD.update()
-                    last_d = d_loss.detach()
+                    d_losses.append(d_loss.item())
+                
+                # Average discriminator loss across multiple steps
+                last_d = sum(d_losses) / len(d_losses)
 
                 # Generator (optimizer.zero_grad for consistency with CGAN)
                 z = torch.randn(bsz, self.z_dim, device=self.device)
@@ -184,14 +187,14 @@ class TabGANTrainer:
                     torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.grad_clip)
                 self.scalerG.step(self.optG)
                 self.scalerG.update()
-                last_g = g_loss.detach()
+                last_g = g_loss.item()
                 ema_update()
 
-                d_total += float(d_loss.item())
-                g_total += float(g_loss.item())
+                d_total += float(last_d)
+                g_total += float(last_g)
 
             pbar.update(1)
-            pbar.set_postfix_str(f"D={last_d.item():.4f} G={last_g.item():.4f}")
+            pbar.set_postfix_str(f"D={last_d:.4f} G={last_g:.4f}")
 
             if self.wb:
                 self.wb.log({
@@ -203,7 +206,7 @@ class TabGANTrainer:
             if ckpt_path and self.save_every and ((epoch + 1) % self.save_every == 0 or epoch == self.epochs - 1):
                 tqdm.write(f"[TabGAN] saving checkpoint at epoch {epoch+1}")
                 self.log.info(f"saving checkpoint at epoch {epoch+1}")
-                self._save_ckpt(ckpt_path, epoch, float(last_g.item()), float(last_d.item()))
+                self._save_ckpt(ckpt_path, epoch, float(last_g), float(last_d))
 
         pbar.close()
         total_sec = time.time() - t0

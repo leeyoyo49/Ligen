@@ -146,8 +146,8 @@ class CGANTrainer:
             self._wb_defined = True
 
         t0 = time.time()
-        last_d = torch.tensor(0.0, device=self.device)
-        last_g = torch.tensor(0.0, device=self.device)
+        last_d = 0.0
+        last_g = 0.0
 
         def ones(b):
             val = 1.0 - self.label_smooth if self.label_smooth > 0 else 1.0
@@ -177,11 +177,11 @@ class CGANTrainer:
                 d_reps = self.d_steps
                 if self.adaptive_balance:
                     # if D is too strong (low loss), reduce its steps; if too weak (high loss), increase steps
-                    ld = float(last_d.item()) if torch.is_tensor(last_d) else float(last_d)
-                    if ld < self.d_loss_low:
+                    if last_d < self.d_loss_low:
                         d_reps = max(1, d_reps - 1)
-                    elif ld > self.d_loss_high:
+                    elif last_d > self.d_loss_high:
                         d_reps = d_reps + 1
+                d_losses = []
                 for _ in range(d_reps):
                     z = torch.randn(bsz, self.noise_dim, device=self.device)
                     with autocast(enabled=self.use_amp):
@@ -201,11 +201,11 @@ class CGANTrainer:
 
                         # optional R1 gradient penalty on real samples
                         if self.r1_gamma > 0:
-                            real_logits_sum = real_logits.sum()
                             grads = torch.autograd.grad(
-                                real_logits_sum, real_in, create_graph=True, retain_graph=True, only_inputs=True
+                                outputs=real_logits.sum(), inputs=real_in,
+                                create_graph=True, retain_graph=True, only_inputs=True
                             )[0]
-                            r1_pen = (grads.view(bsz, -1).pow(2).sum(1)).mean() * (self.r1_gamma * 0.5)
+                            r1_pen = (grads.view(bsz, -1).pow(2).sum(1)).mean() * self.r1_gamma
                             d_loss = d_loss + r1_pen
 
                     self.scalerD.scale(d_loss).backward()
@@ -214,7 +214,10 @@ class CGANTrainer:
                         torch.nn.utils.clip_grad_norm_(self.D.parameters(), self.grad_clip)
                     self.scalerD.step(self.optD)
                     self.scalerD.update()
-                    last_d = d_loss.detach()
+                    d_losses.append(d_loss.item())
+                
+                # Average discriminator loss across multiple steps
+                last_d = sum(d_losses) / len(d_losses)
 
                 # 2) Train G
                 z = torch.randn(bsz, self.noise_dim, device=self.device)
@@ -232,18 +235,18 @@ class CGANTrainer:
                     torch.nn.utils.clip_grad_norm_(self.G.parameters(), self.grad_clip)
                 self.scalerG.step(self.optG)
                 self.scalerG.update()
-                last_g = g_loss.detach()
+                last_g = g_loss.item()
                 ema_update()
 
             # 更新進度條與即時顯示
             pbar.update(1)
-            pbar.set_postfix_str(f"D={last_d.item():.4f} G={last_g.item():.4f}")
+            pbar.set_postfix_str(f"D={last_d:.4f} G={last_g:.4f}")
 
             # W&B 紀錄
             if self.wb:
                 self.wb.log({
-                    "cgan/loss/D": float(last_d.item()),
-                    "cgan/loss/G": float(last_g.item()),
+                    "cgan/loss/D": float(last_d),
+                    "cgan/loss/G": float(last_g),
                     "cgan_step": epoch,
                 })
 
@@ -253,7 +256,7 @@ class CGANTrainer:
             ):
                 tqdm.write(f"[CGAN] saving checkpoint at epoch {epoch+1}")
                 self.log.info(f"saving checkpoint at epoch {epoch+1}")
-                self._save_ckpt(ckpt_path, epoch, float(last_g.item()), float(last_d.item()))
+                self._save_ckpt(ckpt_path, epoch, float(last_g), float(last_d))
                 # optionally upload checkpoint to W&B as artifact
                 if self.wb and getattr(self.cfg, "log_ckpt_to_wandb", False):
                     try:
