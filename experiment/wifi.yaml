@@ -1,0 +1,51 @@
+# adjust according to your dataset
+dataset:
+  kind: wifi            # wifi | spectral  (selects data module)
+  path: Data/datasample_wifi.csv
+  x_cols: ['7C:10:C9:B7:59:5C','EC:58:EA:19:10:B8','EC:58:EA:19:10:BC','EC:58:EA:59:10:BC','EC:58:EA:99:00:78','EC:58:EA:99:10:BC']
+  y_cols: ['positionX','positionY']   # CGAN conditioning coordinates
+
+experiment:
+  base_dir: experiment
+  name: CGAN_wifi_rssi_20241207           # outputs under experiment/<name>/{model,generated_data}
+
+wandb:
+  enabled: false
+  project: localizer
+
+# hyperparameters for different models
+device: auto
+batch_size: 2
+seeds: 50
+
+tabgan:
+  z_dim: 10
+  hidden_size: 256
+  lr: 0.0002
+  betas: [0.5, 0.999]
+  label_smoothing: 0.9
+  synth_multi: 2
+  n_synth: 20000
+  d_steps: 2
+  epochs: 5000
+  save_every: 1000
+
+cgan:
+  noise_dim: 10
+  coord_dim: 2
+  lr: 0.0001
+  d_steps: 2
+  fid_mse_weight: 0.1
+  synth_multi: 5
+  epochs: 10000
+
+mlp:
+  hidden_min: 128
+  hidden_max: 1024
+  lr_min: 0.0001
+  lr_max: 0.001
+  dropout_min: 0.0
+  dropout_max: 0.5
+  epoch_cnt: 2000
+  optuna_trials: 5
+  optuna_epochs: 100

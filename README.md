@@ -1,0 +1,152 @@
+# LIGEN: Tabular/Conditional GANs with MLP baselines
+
+## Quick start
+
+Install required package
+
+```
+pip install -r requirements.txt
+```
+
+Use the dispatcher (defaults to `experiment/spectral.yaml`):
+
+```
+# CGAN pipeline
+python main.py --config experiment/spectral.yaml --runner cgan  
+# TabGAN pipeline  
+python main.py --config experiment/spectral.yaml --runner tabgan  
+# run both
+python main.py --config experiment/spectral.yaml --runner both   
+```
+
+Or call runners directly:
+```
+python -m runners.cgan_runner --config experiment/spectral.yaml
+python -m runners.tabgan_runner --config experiment/spectral.yaml
+```
+
+## Outputs
+Before you run you'll be modifying /Data, /experiment only /Data puts your data.csv, /experiment puts your config.yaml
+
+
+Per‑run directories (timestamped and algorithm‑prefixed):
+
+```
+experiment/<ALG>-<name>-<YYYYmmdd_HHMMSS>/
+	├── your_yaml.yaml   # Original training yaml
+	├── model/           # GAN and MLP checkpoints
+	├── generated_data/  # synthesized CSVs
+	└── logs/            # color‑free log files; latest.log pointer
+
+Results/
+	└── example_output.csv
+```
+
+CSVs
+
+- CGAN: `CGAN_generated_data_p{p}_s{seed}.csv` with columns:
+	[positionX, positionY, <x_cols...>]
+- TabGAN (features only): `TabGAN_generated_features_p{p}_s{seed}.csv` with columns:
+	[<x_cols...>]
+
+Summary metrics are appended to:
+
+```
+Results/
+	CGAN-<kind>-CGAN-<name>-<ts>-results.csv
+	TabGAN-<kind>-TabGAN-<name>-<ts>-results.csv
+```
+
+## Package Architecture
+
+Ligen follows a modular architecture with clear separation of concerns:
+```
+main.py → runners → trainers → {models, utils, dataloader}
+```
+
+### Folder Logic and Data Flow
+
+- **`main.py`**: Entry point that dispatches to appropriate runners based on configuration
+- **`runners/`**: High-level orchestrators that manage complete training pipelines
+  - `cgan_runner.py`: Manages CGAN training → synthesis → MLP evaluation workflow
+  - `tabgan_runner.py`: Manages TabGAN training → synthesis → MLP evaluation workflow
+- **`trainers/`**: Contains training logic and utilities
+  - Implements the actual training loops for GANs and MLPs
+  - Handles model optimization, loss computation, and checkpoint management
+  - Calls into `models/`, `utils/`, and `dataloader/` as needed
+- **`models/`**: Neural network model definitions
+  - `cgan.py`: Conditional GAN implementation
+  - `tabgan.py`: TabGAN implementation  
+  - `mlp.py`: Multi-layer perceptron baseline
+- **`dataloader/`**: Dataset loading and preprocessing utilities
+  - `wifi.py`: Wi-Fi dataset specific processing
+  - `spectral.py`: Spectral dataset specific processing
+- **`utils/`**: Common utilities and helpers
+  - Configuration management, logging, timing, and miscellaneous utilities
+- **`experiment/`**: YAML configuration files for different experiments
+
+## Project Layout
+
+```
+├── main.py                     # Main entry point and dispatcher
+├── requirements.txt            # Python dependencies
+├── LICENSE                     # Project license
+│
+├── Data/                       # Input datasets
+│   ├── datasample_spectral.csv # Spectral dataset sample
+│   └── datasample_wifi.csv     # Wi-Fi dataset sample
+│
+├── runners/                    # High-level pipeline orchestrators
+│   ├── __init__.py
+│   ├── cgan_runner.py          # CGAN end-to-end pipeline (train → synth → MLP)
+│   └── tabgan_runner.py        # TabGAN end-to-end pipeline (train → synth → MLP)
+│
+├── dataloader/                 # Dataset loading and preprocessing
+│   ├── __init__.py             # Dataset API selector by dataset.kind
+│   ├── wifi.py                 # Wi-Fi dataset utilities and transformations
+│   └── spectral.py             # Spectral dataset utilities and transformations
+│
+├── models/                     # Neural network model definitions
+│   ├── __init__.py
+│   ├── cgan.py                 # Conditional GAN implementation
+│   ├── tabgan.py              # TabGAN implementation
+│   └── mlp.py                  # Multi-layer perceptron baseline
+│
+├── trainers/                   # Training loops and optimization logic
+│   ├── __init__.py
+│   ├── cgan_trainer.py         # CGAN training procedures
+│   ├── tabgan_trainer.py       # TabGAN training procedures
+│   ├── mlp_trainer.py          # MLP training procedures
+│   └── common.py               # Shared training utilities
+│
+├── utils/                      # Common utilities and helpers
+│   ├── __init__.py
+│   ├── config.py               # Configuration management
+│   ├── logger.py               # Logging utilities
+│   ├── timing.py               # Performance timing tools
+│   └── misc.py                 # Miscellaneous helper functions
+│
+├── experiment/                 # Configuration templates and examples
+│   ├── spectral.yaml           # Spectral dataset experiment config
+│   └── wifi.yaml               # Wi-Fi dataset experiment config
+│
+└── Results/                    # Auto-generated output directory
+    └── *.csv                   # Summary metrics and evaluation results
+```
+
+
+## Config (YAML)
+
+Minimal required keys (see `experiment/spectral.yaml` and `experiment/wifi.yaml`):
+
+
+## Logging & W&B
+Login in to wandb (you need to turn on in config.yaml)
+
+```
+wandb login # you'll need an wandb account with API key
+```
+
+- Console: colorized logs
+- Files: `experiment/<...>/logs/` (with `latest.log`)
+- Weights & Biases: set `wandb.enabled: true` in YAML (project from config)

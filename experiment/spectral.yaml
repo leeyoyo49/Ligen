@@ -1,0 +1,51 @@
+# adjust according to your dataset
+dataset:
+  kind: spectral
+  path: Data/datasample_spectral.csv
+  x_cols: [F1,F2,F3,F4,F5,F6,F7,F8,Clear,NIR]
+  y_cols: [x,y]
+
+experiment:
+  base_dir: experiment # directory to save results
+  name: Spectral_20241126_clean # experiment name
+
+wandb:
+  enabled: false
+  project: localizer
+
+# hyperparameters for different models
+device: auto # set to "cpu" or "cuda" to override auto-detection
+batch_size: 2
+seeds: 20 # count of experiment
+
+tabgan:
+  z_dim: 10
+  hidden_size: 256
+  lr: 0.0002
+  betas: [0.5, 0.999]
+  label_smoothing: 0.9
+  synth_multi: 2
+  n_synth: 20000
+  d_steps: 2
+  epochs: 5000
+  save_every: 1000
+  
+cgan:
+  noise_dim: 10
+  coord_dim: 2
+  lr: 0.00001
+  d_steps: 2
+  fid_mse_weight: 0.1
+  synth_multi: 2
+  epochs: 6000
+
+mlp:
+  hidden_min: 64
+  hidden_max: 1024
+  lr_min: 0.0001
+  lr_max: 0.01
+  dropout_min: 0.1
+  dropout_max: 0.5
+  epoch_cnt: 3000 
+  optuna_trials: 3
+  optuna_epochs: 500

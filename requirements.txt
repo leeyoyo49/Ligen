@@ -1,0 +1,6 @@
+torch>=2.1
+pandas>=2.0
+numpy>=1.24
+optuna>=3.0
+pyyaml>=6.0
+wandb>=0.15

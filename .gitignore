@@ -1,0 +1,10 @@
+db.sqlite3
+.DS_Store
+experiment/*
+!experiment/spectral.yaml
+!experiment/wifi.yaml
+wandb/
+.venv/
+__pycache__/
+Results/*
+!Results/example_output.csv

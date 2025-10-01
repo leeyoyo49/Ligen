@@ -1,0 +1,2 @@
+model,train_size,seed,test_loss_before,test_loss_after
+TabGAN-Spectral_20241207ds-20250908_180116_TabGAN_aug_spectral_p9_s0,9,0,3.0320746898651123,1.945152282714844
