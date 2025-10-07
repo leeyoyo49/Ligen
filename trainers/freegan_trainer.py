@@ -11,7 +11,7 @@ except Exception:
 from types import SimpleNamespace
 
 # ...existing code...
-from models.tabgan import TabGenerator, TabDiscriminator  # keep current class names
+from models.freegan import TabGenerator, TabDiscriminator  # keep current class names
 from trainers.common import ETAMeter, format_hms
 from utils.logger import get_logger
 from tqdm.auto import tqdm
@@ -21,18 +21,18 @@ def dict_to_ns(d: dict):
     return SimpleNamespace(**d)
 
 
-class TabGANTrainer:
+class freeganTrainer:
     """
     Generic Tabular GAN trainer (unconditional).
     DataLoader should yield a tensor batch X with shape [B, x_dim].
     """
 
-    def __init__(self, x_dim: int, cfg_tabgan: dict, device: str = "cuda", wb=None):
+    def __init__(self, x_dim: int, cfg_freegan: dict, device: str = "cuda", wb=None):
         self.x_dim = x_dim
-        self.cfg = dict_to_ns(cfg_tabgan)
+        self.cfg = dict_to_ns(cfg_freegan)
         self.device = torch.device(device)
         self.wb = wb
-        self.log = get_logger("trainer.tabgan")
+        self.log = get_logger("trainer.freegan")
 
         # hyperparams
         self.z_dim = getattr(self.cfg, "z_dim", x_dim)
@@ -75,7 +75,7 @@ class TabGANTrainer:
         self._wb_defined = False
 
         self.log.info(
-            f"initialized TabGAN: x_dim={x_dim} z_dim={self.z_dim} hidden={self.hidden_size} "
+            f"initialized freegan: x_dim={x_dim} z_dim={self.z_dim} hidden={self.hidden_size} "
             f"lr_g={self.lr_g:.2e} lr_d={self.lr_d:.2e} betas={self.betas} epochs={self.epochs} d_steps={self.d_steps}"
         )
 
@@ -94,7 +94,7 @@ class TabGANTrainer:
             },
             path,
         )
-        tqdm.write(f"[TabGAN] checkpoint saved @ epoch {epoch} → {path}")
+        tqdm.write(f"[freegan] checkpoint saved @ epoch {epoch} → {path}")
         self.log.info(f"checkpoint saved @ epoch {epoch} → {path}")
 
     def _maybe_resume(self, path: Optional[str]) -> int:
@@ -111,11 +111,11 @@ class TabGANTrainer:
     def train(self, loader: torch.utils.data.DataLoader, ckpt_path: Optional[str] = None, resume: bool = True) -> Dict[str, float]:
         start_epoch = self._maybe_resume(ckpt_path) if resume else 0
         self.log.info(f"start training: epochs={self.epochs} lr_g={self.lr_g} lr_d={self.lr_d} device={self.device} amp={self.use_amp}")
-        pbar = tqdm(total=self.epochs, initial=start_epoch, desc="[TabGAN] Training", dynamic_ncols=True)
+        pbar = tqdm(total=self.epochs, initial=start_epoch, desc="[freegan] Training", dynamic_ncols=True)
         # define W&B metric here too (defensive)
         if self.wb and not self._wb_defined:
             try:
-                self.wb.define_metric("tabgan/*", step_metric="tabgan_step")
+                self.wb.define_metric("freegan/*", step_metric="freegan_step")
             except Exception:
                 pass
             self._wb_defined = True
@@ -198,20 +198,20 @@ class TabGANTrainer:
 
             if self.wb:
                 self.wb.log({
-                    "tabgan/loss/D": d_total / max(nb, 1),
-                    "tabgan/loss/G": g_total / max(nb, 1),
-                    "tabgan_step": epoch,
+                    "freegan/loss/D": d_total / max(nb, 1),
+                    "freegan/loss/G": g_total / max(nb, 1),
+                    "freegan_step": epoch,
                 })
 
             if ckpt_path and self.save_every and ((epoch + 1) % self.save_every == 0 or epoch == self.epochs - 1):
-                tqdm.write(f"[TabGAN] saving checkpoint at epoch {epoch+1}")
+                tqdm.write(f"[freegan] saving checkpoint at epoch {epoch+1}")
                 self.log.info(f"saving checkpoint at epoch {epoch+1}")
                 self._save_ckpt(ckpt_path, epoch, float(last_g), float(last_d))
 
         pbar.close()
         total_sec = time.time() - t0
         if self.wb:
-            self.wb.log({"tabgan/time/train_total_sec": float(total_sec)})
+            self.wb.log({"freegan/time/train_total_sec": float(total_sec)})
 
         self.log.info(f"training finished. total_sec={total_sec:.2f}")
         return {"train_total_sec": total_sec}

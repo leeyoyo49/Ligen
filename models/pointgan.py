@@ -12,7 +12,7 @@ def _get_activation(name: str):
     return nn.LeakyReLU(0.2, inplace=True)
 
 
-class CGANGenerator(nn.Module):
+class pointganGenerator(nn.Module):
     """MLP Generator with optional BatchNorm and configurable hidden sizes/activation.
 
     Defaults kept close to original unless cfg overrides them.
@@ -53,7 +53,7 @@ class CGANGenerator(nn.Module):
         return self.net(x)
 
 
-class CGANDiscriminator(nn.Module):
+class pointganDiscriminator(nn.Module):
     """MLP Discriminator with optional SpectralNorm/Dropout; outputs logits (no Sigmoid).
     Use BCEWithLogitsLoss on the outputs.
     """

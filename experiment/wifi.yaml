@@ -7,7 +7,7 @@ dataset:
 
 experiment:
   base_dir: experiment
-  name: CGAN_wifi_rssi_20241207           # outputs under experiment/<name>/{model,generated_data}
+  name: wifi_rssi           # outputs under experiment/<name>/{model,generated_data}
 
 wandb:
   enabled: false
@@ -18,7 +18,7 @@ device: auto
 batch_size: 2
 seeds: 50
 
-tabgan:
+freegan:
   z_dim: 10
   hidden_size: 256
   lr: 0.0002
@@ -30,7 +30,7 @@ tabgan:
   epochs: 5000
   save_every: 1000
 
-cgan:
+pointgan:
   noise_dim: 10
   coord_dim: 2
   lr: 0.0001

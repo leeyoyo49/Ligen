@@ -11,7 +11,7 @@ try:
 except Exception:  # fallback for CPU-only or PyTorch>=2 environments
     from torch.amp import autocast, GradScaler  # type: ignore
 
-from models.cgan import CGANGenerator, CGANDiscriminator
+from models.pointgan import pointganGenerator, pointganDiscriminator
 from trainers.common import ETAMeter, format_hms  # kept in case used elsewhere
 
 from tqdm.auto import tqdm
@@ -22,7 +22,7 @@ def dict_to_ns(d: dict):
     return SimpleNamespace(**d)
 
 
-class CGANTrainer:
+class pointganTrainer:
     """
     Conditional GAN: DataLoader must yield (coords [B,coord_dim], feats [B,feat_dim]).
     """
@@ -31,16 +31,16 @@ class CGANTrainer:
         self,
         coord_dim: int,
         feat_dim: int,
-        cfg_cgan: dict,          # 🔑 接 dict
+        cfg_pointgan: dict,          # 🔑 接 dict
         device: str = "cuda",
         wb=None,
     ):
         self.coord_dim = coord_dim
         self.feat_dim = feat_dim
-        self.cfg = dict_to_ns(cfg_cgan)      # 🔑 dict → Namespace
+        self.cfg = dict_to_ns(cfg_pointgan)      # 🔑 dict → Namespace
         self.device = torch.device(device)
         self.wb = wb
-        self.log = get_logger("trainer.cgan")
+        self.log = get_logger("trainer.pointgan")
 
         # hyperparameters
         self.noise_dim = getattr(self.cfg, "noise_dim", 10)
@@ -64,8 +64,8 @@ class CGANTrainer:
         self.d_loss_high = float(getattr(self.cfg, "d_loss_high", 0.85))
 
     # models and optimizers
-        self.G = CGANGenerator(self.noise_dim, coord_dim, feat_dim, cfg=self.cfg).to(self.device)
-        self.D = CGANDiscriminator(coord_dim, feat_dim, cfg=self.cfg).to(self.device)
+        self.G = pointganGenerator(self.noise_dim, coord_dim, feat_dim, cfg=self.cfg).to(self.device)
+        self.D = pointganDiscriminator(coord_dim, feat_dim, cfg=self.cfg).to(self.device)
         # BCE with logits for numerical stability (no Sigmoid in D)
         self.bce_logits = nn.BCEWithLogitsLoss()
         self.mse = nn.MSELoss()
@@ -92,7 +92,7 @@ class CGANTrainer:
         self._wb_defined = False
 
         self.log.info(
-            "initialized CGAN: coord_dim=%d feat_dim=%d noise_dim=%d lr_g=%.2e lr_d=%.2e d_steps=%d epochs=%d"
+            "initialized pointgan: coord_dim=%d feat_dim=%d noise_dim=%d lr_g=%.2e lr_d=%.2e d_steps=%d epochs=%d"
             % (coord_dim, feat_dim, self.noise_dim, self.lr_g, self.lr_d, self.d_steps, self.epochs)
         )
 
@@ -110,7 +110,7 @@ class CGANTrainer:
             },
             path,
         )
-        tqdm.write(f"[CGAN] checkpoint saved @ epoch {epoch} → {path}")
+        tqdm.write(f"[pointgan] checkpoint saved @ epoch {epoch} → {path}")
         self.log.info(f"checkpoint saved @ epoch {epoch} → {path}")
 
     def _maybe_resume(self, path: Optional[str]) -> int:
@@ -135,12 +135,12 @@ class CGANTrainer:
         self.train_dataset = getattr(loader, "dataset", None)
 
         # tqdm 進度條（按 epoch 走）
-        pbar = tqdm(total=self.epochs, initial=start_epoch, desc="[CGAN] Training", dynamic_ncols=True)
+        pbar = tqdm(total=self.epochs, initial=start_epoch, desc="[pointgan] Training", dynamic_ncols=True)
 
         # define W&B step metric here as well (defensive, in case not defined by caller)
         if self.wb and not self._wb_defined:
             try:
-                self.wb.define_metric("cgan/*", step_metric="cgan_step")
+                self.wb.define_metric("pointgan/*", step_metric="pointgan_step")
             except Exception as e:
                 self.log.debug(f"wandb.define_metric failed: {e}")
             self._wb_defined = True
@@ -245,22 +245,22 @@ class CGANTrainer:
             # W&B 紀錄
             if self.wb:
                 self.wb.log({
-                    "cgan/loss/D": float(last_d),
-                    "cgan/loss/G": float(last_g),
-                    "cgan_step": epoch,
+                    "pointgan/loss/D": float(last_d),
+                    "pointgan/loss/G": float(last_g),
+                    "pointgan_step": epoch,
                 })
 
             # 存檢查點時用 tqdm.write() 避免進度條被打亂
             if ckpt_path and self.save_every and (
                 (epoch + 1) % self.save_every == 0 or epoch == self.epochs - 1
             ):
-                tqdm.write(f"[CGAN] saving checkpoint at epoch {epoch+1}")
+                tqdm.write(f"[pointgan] saving checkpoint at epoch {epoch+1}")
                 self.log.info(f"saving checkpoint at epoch {epoch+1}")
                 self._save_ckpt(ckpt_path, epoch, float(last_g), float(last_d))
                 # optionally upload checkpoint to W&B as artifact
                 if self.wb and getattr(self.cfg, "log_ckpt_to_wandb", False):
                     try:
-                        art = self.wb.Artifact("cgan-checkpoint", type="model")
+                        art = self.wb.Artifact("pointgan-checkpoint", type="model")
                         art.add_file(ckpt_path)
                         self.wb.log_artifact(art)
                     except Exception as e:
@@ -270,12 +270,12 @@ class CGANTrainer:
 
         total_sec = time.time() - t0
         if self.wb:
-            self.wb.log({"cgan/time/train_total_sec": float(total_sec)})
+            self.wb.log({"pointgan/time/train_total_sec": float(total_sec)})
             # NEW: table for single-value train-time summary
             try:
                 time_tbl = self.wb.Table(columns=["train_total_sec"])
                 time_tbl.add_data(float(total_sec))
-                self.wb.log({"cgan/time/train_summary_table": time_tbl})
+                self.wb.log({"pointgan/time/train_summary_table": time_tbl})
             except Exception as e:
                 self.log.debug(f"W&B time table log failed: {e}")
 
@@ -346,11 +346,11 @@ class CGANTrainer:
         if self.wb:
             try:
                 self.wb.log({
-                    "cgan/synth/unique_pairs": int(coords_unique.size(0)),
-                    "cgan/synth/synth_multi": int(synth_multi),
-                    "cgan/synth/max_count": int(max_count),
-                    "cgan/synth/repeats": int(repeats),
-                    "cgan/synth/samples": int(n),
+                    "pointgan/synth/unique_pairs": int(coords_unique.size(0)),
+                    "pointgan/synth/synth_multi": int(synth_multi),
+                    "pointgan/synth/max_count": int(max_count),
+                    "pointgan/synth/repeats": int(repeats),
+                    "pointgan/synth/samples": int(n),
                 })
                 # NEW: table for single-value synth stats
                 synth_tbl = self.wb.Table(columns=[
@@ -360,7 +360,7 @@ class CGANTrainer:
                     int(coords_unique.size(0)), int(synth_multi),
                     int(max_count), int(repeats), int(n)
                 )
-                self.wb.log({"cgan/synth/stats_table": synth_tbl})
+                self.wb.log({"pointgan/synth/stats_table": synth_tbl})
             except Exception as e:
                 self.log.debug(f"W&B log synth stats failed: {e}")
 
