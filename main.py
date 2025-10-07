@@ -7,18 +7,18 @@ def main():
     parser.add_argument(
         "--runner",
         type=str,
-        choices=["cgan", "tabgan", "both"],
+        choices=["pointgan", "freegan", "both"],
         default="both",
         help="Which runner to execute"
     )
     args = parser.parse_args()
 
-    if args.runner in ("cgan", "both"):
-        from runners.cgan_runner import run as run_cgan
-        run_cgan(args.config)
-    if args.runner in ("tabgan", "both"):
-        from runners.tabgan_runner import run as run_tabgan
-        run_tabgan(args.config)
+    if args.runner in ("pointgan", "both"):
+        from runners.pointgan_runner import run as run_pointgan
+        run_pointgan(args.config)
+    if args.runner in ("freegan", "both"):
+        from runners.freegan_runner import run as run_freegan
+        run_freegan(args.config)
 
 
 if __name__ == "__main__":

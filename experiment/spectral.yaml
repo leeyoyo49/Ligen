@@ -2,12 +2,13 @@
 dataset:
   kind: spectral
   path: Data/datasample_spectral.csv
+
   x_cols: [F1,F2,F3,F4,F5,F6,F7,F8,Clear,NIR]
-  y_cols: [x,y]
+  y_cols: [x,y]   # whatever you name you x, y just let the first to be x, the second to be y
 
 experiment:
   base_dir: experiment # directory to save results
-  name: Spectral_20241126_clean # experiment name
+  name: Spectral_clean # experiment name
 
 wandb:
   enabled: false
@@ -16,36 +17,37 @@ wandb:
 # hyperparameters for different models
 device: auto # set to "cpu" or "cuda" to override auto-detection
 batch_size: 2
-seeds: 20 # count of experiment
+seeds: 2 # count of experiment
 
-tabgan:
+freegan:
   z_dim: 10
   hidden_size: 256
   lr: 0.0002
   betas: [0.5, 0.999]
   label_smoothing: 0.9
   synth_multi: 2
-  n_synth: 20000
+  n_synth: 200
   d_steps: 2
-  epochs: 5000
+  epochs: 10
   save_every: 1000
-  
-cgan:
+  gen_use_bn: false  # Disable BatchNorm for small datasets
+
+pointgan:
   noise_dim: 10
   coord_dim: 2
   lr: 0.00001
   d_steps: 2
   fid_mse_weight: 0.1
   synth_multi: 2
-  epochs: 6000
+  epochs: 10
 
 mlp:
-  hidden_min: 64
-  hidden_max: 1024
-  lr_min: 0.0001
-  lr_max: 0.01
+  hidden_min: 16
+  hidden_max: 64
+  lr_min: 0.00001
+  lr_max: 0.001
   dropout_min: 0.1
-  dropout_max: 0.5
-  epoch_cnt: 3000 
-  optuna_trials: 3
-  optuna_epochs: 500
+  dropout_max: 0.3
+  epoch_cnt: 30
+  optuna_trials: 5 # you might occur bug if this is too small, I think 2 might be too small
+  optuna_epochs: 50

@@ -188,17 +188,7 @@ class MLPTrainer:
                     })
 
                 trial.report(eval_loss, epoch)
-                if trial.should_prune():
-                    pbar.set_postfix_str(f"PRUNED@{epoch} eval={eval_loss:.4f}")
-                    pbar.close()
-                    if trun is not None:
-                        # NEW: also log the (partial) table before finishing
-                        if tune_table is not None:
-                            trun.log({f"{self.tag}/tables/tune_metrics": tune_table})
-                        trun.log({f"{self.tag}/time/tune_time_total": meter.elapsed, "epoch": epoch})
-                        trun.finish()
-                    self.log.warning(f"[{self.tag}] trial {trial.number} pruned at epoch {epoch} (eval={eval_loss:.4f})")
-                    raise optuna.TrialPruned()
+                # Pruning disabled - let all trials run to completion
 
             pbar.close()
             if trun is not None:
