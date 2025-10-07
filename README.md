@@ -1,5 +1,7 @@
 # LIGEN: Tabular/Conditional GANs with MLP baselines
 
+Check `tutorial.ipynb` for tutorial
+
 ## Quick start
 
 Install required package
@@ -11,18 +13,18 @@ pip install -r requirements.txt
 Use the dispatcher (defaults to `experiment/spectral.yaml`):
 
 ```
-# CGAN pipeline
-python main.py --config experiment/spectral.yaml --runner cgan  
-# TabGAN pipeline  
-python main.py --config experiment/spectral.yaml --runner tabgan  
+# PointGAN pipeline
+python main.py --config experiment/spectral.yaml --runner pointgan  
+# FreeGAN pipeline  
+python main.py --config experiment/spectral.yaml --runner freegan  
 # run both
 python main.py --config experiment/spectral.yaml --runner both   
 ```
 
 Or call runners directly:
 ```
-python -m runners.cgan_runner --config experiment/spectral.yaml
-python -m runners.tabgan_runner --config experiment/spectral.yaml
+python -m runners.pointgan_runner --config experiment/spectral.yaml
+python -m runners.freegan_runner --config experiment/spectral.yaml
 ```
 
 ## Outputs
@@ -44,17 +46,17 @@ Results/
 
 CSVs
 
-- CGAN: `CGAN_generated_data_p{p}_s{seed}.csv` with columns:
+- PointGAN: `pointgan_generated_data_p{p}_s{seed}.csv` with columns:
 	[positionX, positionY, <x_cols...>]
-- TabGAN (features only): `TabGAN_generated_features_p{p}_s{seed}.csv` with columns:
+- FreeGAN (features only): `freegan_generated_features_p{p}_s{seed}.csv` with columns:
 	[<x_cols...>]
 
 Summary metrics are appended to:
 
 ```
 Results/
-	CGAN-<kind>-CGAN-<name>-<ts>-results.csv
-	TabGAN-<kind>-TabGAN-<name>-<ts>-results.csv
+	pointgan-<kind>-pointgan-<name>-<ts>-results.csv
+	freegan-<kind>-freegan-<name>-<ts>-results.csv
 ```
 
 ## Package Architecture
@@ -68,15 +70,15 @@ main.py → runners → trainers → {models, utils, dataloader}
 
 - **`main.py`**: Entry point that dispatches to appropriate runners based on configuration
 - **`runners/`**: High-level orchestrators that manage complete training pipelines
-  - `cgan_runner.py`: Manages CGAN training → synthesis → MLP evaluation workflow
-  - `tabgan_runner.py`: Manages TabGAN training → synthesis → MLP evaluation workflow
+  - `pointgan_runner.py`: Manages PointGAN training → synthesis → MLP evaluation workflow
+  - `freegan_runner.py`: Manages FreeGAN training → synthesis → MLP evaluation workflow
 - **`trainers/`**: Contains training logic and utilities
   - Implements the actual training loops for GANs and MLPs
   - Handles model optimization, loss computation, and checkpoint management
   - Calls into `models/`, `utils/`, and `dataloader/` as needed
 - **`models/`**: Neural network model definitions
-  - `cgan.py`: Conditional GAN implementation
-  - `tabgan.py`: TabGAN implementation  
+  - `pointgan.py`: PointGAN (conditional GAN) implementation
+  - `freegan.py`: FreeGAN (unconditional GAN) implementation  
   - `mlp.py`: Multi-layer perceptron baseline
 - **`dataloader/`**: Dataset loading and preprocessing utilities
   - `wifi.py`: Wi-Fi dataset specific processing
@@ -98,8 +100,8 @@ main.py → runners → trainers → {models, utils, dataloader}
 │
 ├── runners/                    # High-level pipeline orchestrators
 │   ├── __init__.py
-│   ├── cgan_runner.py          # CGAN end-to-end pipeline (train → synth → MLP)
-│   └── tabgan_runner.py        # TabGAN end-to-end pipeline (train → synth → MLP)
+│   ├── pointgan_runner.py      # PointGAN end-to-end pipeline (train → synth → MLP)
+│   └── freegan_runner.py       # FreeGAN end-to-end pipeline (train → synth → MLP)
 │
 ├── dataloader/                 # Dataset loading and preprocessing
 │   ├── __init__.py             # Dataset API selector by dataset.kind
@@ -108,14 +110,14 @@ main.py → runners → trainers → {models, utils, dataloader}
 │
 ├── models/                     # Neural network model definitions
 │   ├── __init__.py
-│   ├── cgan.py                 # Conditional GAN implementation
-│   ├── tabgan.py              # TabGAN implementation
+│   ├── pointgan.py             # PointGAN (conditional GAN) implementation
+│   ├── freegan.py              # FreeGAN (unconditional GAN) implementation
 │   └── mlp.py                  # Multi-layer perceptron baseline
 │
 ├── trainers/                   # Training loops and optimization logic
 │   ├── __init__.py
-│   ├── cgan_trainer.py         # CGAN training procedures
-│   ├── tabgan_trainer.py       # TabGAN training procedures
+│   ├── pointgan_trainer.py     # PointGAN training procedures
+│   ├── freegan_trainer.py      # FreeGAN training procedures
 │   ├── mlp_trainer.py          # MLP training procedures
 │   └── common.py               # Shared training utilities
 │
@@ -138,6 +140,26 @@ main.py → runners → trainers → {models, utils, dataloader}
 ## Config (YAML)
 
 Minimal required keys (see `experiment/spectral.yaml` and `experiment/wifi.yaml`):
+
+### Supported Models
+
+- **PointGAN**: Conditional GAN for coordinate-based data generation
+- **FreeGAN**: Unconditional GAN for tabular data generation  
+- **MLP**: Multi-layer perceptron baseline with Optuna hyperparameter optimization
+
+## Tutorial
+
+For a comprehensive tutorial on using Ligen, see `tutorial.ipynb`. The notebook covers:
+
+- Environment setup and installation
+- Data exploration and understanding
+- Configuration file structure
+- Model training with sample data
+- Results interpretation
+- Single data inference examples
+- Advanced usage tips and troubleshooting
+
+The tutorial includes hands-on examples with both spectral sensor data and WiFi positioning datasets.
 
 
 ## Logging & W&B
