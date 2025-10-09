@@ -1,4 +1,4 @@
-# LIGEN: Tabular/Conditional GANs with MLP baselines
+# LIGEN
 
 Check `tutorial.ipynb` for tutorial
 
